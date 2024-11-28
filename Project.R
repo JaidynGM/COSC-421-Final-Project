@@ -1,4 +1,3 @@
-# Load required libraries
 library(dplyr)
 library(tidyr)
 library(igraph)
