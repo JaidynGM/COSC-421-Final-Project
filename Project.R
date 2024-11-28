@@ -7,19 +7,16 @@ library(tidytext)
 
 setwd("C:/Users/jaidy/COSC421/COSC-421-Final-Project")
 
-# Read and prepare data
 spotify_df <- read.csv("spotify-2023.csv", encoding = "latin1")
 
-# Function to clean artist names
 clean_artist_names <- function(name) {
   trimws(gsub("[^[:alnum:][:space:]&]", "", name))
 }
 
 analyze_collaborations <- function(data) {
-  # Filter for collaborations and create pairs
+
   collaborations <- data %>% filter(artist_count > 1)
   
-  # Create empty dataframe for artist pairs
   artist_pairs <- data.frame(
     Artist_1 = character(),
     Artist_2 = character(),
@@ -28,10 +25,9 @@ analyze_collaborations <- function(data) {
     Released_Year = numeric(),
     stringsAsFactors = FALSE
   )
-  
-  # Process each collaboration
+
   for (i in 1:nrow(collaborations)) {
-    # Safely extract artists
+
     artists <- tryCatch({
       artists <- trimws(unlist(strsplit(collaborations$artist.s._name[i], ",")))
       sapply(artists, clean_artist_names)
@@ -42,8 +38,7 @@ analyze_collaborations <- function(data) {
     
     if (!is.null(artists) && length(artists) > 1) {
       pairs <- combn(artists, 2, simplify = FALSE)
-      
-      # Safely create pairs
+
       for (pair in pairs) {
         tryCatch({
           new_row <- data.frame(
@@ -62,12 +57,10 @@ analyze_collaborations <- function(data) {
     }
   }
   
-  # Check if we have any data
   if (nrow(artist_pairs) == 0) {
     stop("No valid artist pairs were created")
   }
   
-  # Aggregate collaboration metrics
   artist_pairs_summary <- artist_pairs %>%
     group_by(Artist_1, Artist_2) %>%
     summarize(
@@ -84,38 +77,32 @@ analyze_collaborations <- function(data) {
   return(artist_pairs_summary)
 }
 
-# Create and analyze network
 create_collaboration_network <- function(artist_pairs_summary) {
-  # Create graph
+
   graph <- graph_from_data_frame(
     select(artist_pairs_summary, Artist_1, Artist_2, Collaboration_Count),
     directed = FALSE
   )
-  
-  # Calculate network metrics
+
   V(graph)$degree <- degree(graph, mode = "all")
   V(graph)$betweenness <- betweenness(graph, directed = FALSE)
   V(graph)$eigenvector <- eigen_centrality(graph)$vector
   V(graph)$community <- membership(cluster_louvain(graph))
-  
-  # Calculate edge weight based on collaboration count
+
   E(graph)$weight <- artist_pairs_summary$Collaboration_Count
   
   return(graph)
 }
 
-# Visualization function
 plot_collaboration_network <- function(graph, min_degree = 2) {
-  # Filter to show only artists with minimum number of collaborations
+
   subnet <- induced_subgraph(
     graph,
     V(graph)[degree(graph) >= min_degree]
   )
   
-  # Create layout
   layout <- layout_with_fr(subnet)
-  
-  # Plot with communities
+
   plot(subnet,
        layout = layout,
        vertex.size = sqrt(V(subnet)$degree) * 2,
@@ -127,11 +114,9 @@ plot_collaboration_network <- function(graph, min_degree = 2) {
        main = "Artist Collaboration Network (Filtered)")
 }
 
-# Modified analyze_genres function to focus on artist communities
 analyze_genres <- function(graph, artist_pairs_summary) {
   communities <- membership(cluster_louvain(graph))
   
-  # Create community mapping
   community_analysis <- data.frame(
     Artist = V(graph)$name,
     Community = communities
@@ -145,9 +130,8 @@ analyze_genres <- function(graph, artist_pairs_summary) {
   return(community_analysis)
 }
 
-# Analyze emerging artists
 analyze_emerging_artists <- function(graph, artist_pairs_summary) {
-  # Identify newer artists (those who started collaborating more recently)
+  
   emerging_artists <- artist_pairs_summary %>%
     group_by(Artist_1) %>%
     summarize(
@@ -155,10 +139,9 @@ analyze_emerging_artists <- function(graph, artist_pairs_summary) {
       Num_Collabs = n(),
       Avg_Streams = mean(Total_Streams)
     ) %>%
-    filter(First_Appearance >= max(First_Appearance) - 2) %>%  # Focus on last 2 years
+    filter(First_Appearance >= max(First_Appearance) - 2) %>%
     arrange(desc(Avg_Streams))
   
-  # Get their collaboration patterns with influential artists
   emerging_connections <- artist_pairs_summary %>%
     filter(Artist_1 %in% emerging_artists$Artist_1 |
              Artist_2 %in% emerging_artists$Artist_1) %>%
@@ -170,9 +153,8 @@ analyze_emerging_artists <- function(graph, artist_pairs_summary) {
   ))
 }
 
-# Generate summary statistics
 generate_summary_stats <- function(graph, artist_pairs_summary) {
-  # Network-level metrics
+
   network_stats <- list(
     num_artists = vcount(graph),
     num_collaborations = ecount(graph),
@@ -181,8 +163,7 @@ generate_summary_stats <- function(graph, artist_pairs_summary) {
     modularity = modularity(cluster_louvain(graph)),
     transitivity = transitivity(graph)
   )
-  
-  # Artist-level metrics
+
   artist_stats <- data.frame(
     Artist = V(graph)$name,
     Degree = degree(graph),
@@ -202,7 +183,6 @@ generate_summary_stats <- function(graph, artist_pairs_summary) {
     ) %>%
     arrange(desc(Degree), desc(Betweenness))
   
-  # Add correlation analysis
   correlations <- cor(
     artist_stats %>% 
       select(Degree, Betweenness, Eigenvector, Total_Streams, Avg_Streams),
@@ -216,19 +196,16 @@ generate_summary_stats <- function(graph, artist_pairs_summary) {
   ))
 }
 
-# Main analysis execution
 main_analysis <- function() {
-  # Perform analysis
+
   artist_pairs_summary <- analyze_collaborations(spotify_df)
   graph <- create_collaboration_network(artist_pairs_summary)
   stats <- generate_summary_stats(graph, artist_pairs_summary)
   community_analysis <- analyze_genres(graph, artist_pairs_summary)
   emerging_analysis <- analyze_emerging_artists(graph, artist_pairs_summary)
   
-  # Create visualizations
   plot_collaboration_network(graph, min_degree = 3)
-  
-  # Print summary statistics
+
   cat("\nNetwork Statistics:\n")
   print(stats$network_stats)
   
@@ -253,5 +230,4 @@ main_analysis <- function() {
   ))
 }
 
-# Run the analysis
 results <- main_analysis()
