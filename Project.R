@@ -105,7 +105,7 @@ plot_collaboration_network <- function(graph, min_degree = 2) {
   plot(subnet,
        layout = layout,
        vertex.size = sqrt(V(subnet)$degree) * 2,
-       vertex.label = V(subnet)$name,
+       vertex.label = NA,
        vertex.label.cex = 0.6,
        vertex.label.dist = 0.8,
        vertex.color = factor(V(subnet)$community),
@@ -138,7 +138,7 @@ analyze_emerging_artists <- function(graph, artist_pairs_summary) {
       Num_Collabs = n(),
       Avg_Streams = mean(Total_Streams)
     ) %>%
-    filter(First_Appearance >= max(First_Appearance) - 2) %>%
+    filter(First_Appearance >= max(First_Appearance) - 1) %>%
     arrange(desc(Avg_Streams))
   
   emerging_connections <- artist_pairs_summary %>%
@@ -230,3 +230,4 @@ main_analysis <- function() {
 }
 
 results <- main_analysis()
+
